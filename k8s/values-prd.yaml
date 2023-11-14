@@ -31,6 +31,10 @@ awsSecret:
   enabled: false
   name: "thn-prd-fontless"
 
+crossplaneSecret:
+  enabled: false
+  preventDelete: false
+
 ## Configure Resources for Containers
 ## ref: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 resources:
