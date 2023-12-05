@@ -32,8 +32,6 @@ jobs:
           region: AWS_REGION
           repo: ${ECR_REPOSITORY}
           skip-when-tags-exist: true
-          setup-remote-docker: true
-          remote-docker-layer-caching: true
           tag: ${CIRCLE_TAG},"latest"
       - helm/install-helm-client:
           version: "v3.7.2"
