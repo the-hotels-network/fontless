@@ -23,8 +23,10 @@ datadogAppAnnotations: '[{ "source" : "fontless-prd", "service": "fontless-prd" 
 apm: true
 terminationGracePeriodSeconds: 60
 
-command: |
-  ["/bin/sh", "-c", "cd /app/ && npm run start"]
+entrypoint:
+  - /bin/sh
+  - -c
+  - cd /app/ && npm run start
 
 # AWS Secret Manager
 awsSecret:
