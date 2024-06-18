@@ -76,7 +76,7 @@ var getContents = function (org, repo, files, path) {
                     var res, data;
                     return __generator(this, function (_a) {
                         switch (_a.label) {
-                            case 0: return [4 /*yield*/, fetch("https://raw.githubusercontent.com/" + org + "/" + repo + "/master/" + path + "/" + file.path)];
+                            case 0: return [4 /*yield*/, fetch("https://raw.githubusercontent.com/" + org + "/" + repo + "/main/" + path + "/" + file.path)];
                             case 1:
                                 res = _a.sent();
                                 return [4 /*yield*/, res.text()];

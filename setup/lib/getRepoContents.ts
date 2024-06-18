@@ -24,7 +24,7 @@ let getContents = async (
   return Promise.all(
     filteredFiles.map(async file => {
       let res = await fetch(
-        `https://raw.githubusercontent.com/${org}/${repo}/master/${path}/${file.path}`
+        `https://raw.githubusercontent.com/${org}/${repo}/main/${path}/${file.path}`
       );
       let data = await res.text();
       return {
