@@ -8,8 +8,31 @@ defaults: &defaults
   resource_class: medium
   environment:
     CHART_VERSION: 1.2.8
+pr_filters: &pr_filters
+  filters:
+    tags:
+      ignore: /.*/
+    branches:
+      only: /.*/
 jobs:
-
+  qodana-scan:
+    docker:
+      - image: jetbrains/qodana-js:2024.3
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - qodana-js-{{ .Branch }}-v1
+            - qodana-js-main-v1
+      - run:
+          name: Scan with Qodana
+          command: |
+            mkdir -p .qodana/cache
+            qodana scan --cache-dir=.qodana/cache
+      - save_cache:
+          key: qodana-js-{{ .Branch }}-v1
+          paths:
+            - .qodana/cache
   deploy:
     <<: *defaults
     docker:
@@ -55,6 +78,10 @@ jobs:
             echo "deployment succeeded"
 
 workflows:
+  pullrequest:
+    jobs:
+      - qodana-scan:
+          <<: *pr_filters
   staging:
     jobs:
       - deploy:
