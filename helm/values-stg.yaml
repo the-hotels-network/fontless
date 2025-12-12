@@ -4,10 +4,6 @@ applicationName: "fontless"
 # Where to install ALL objects of the chart.
 namespace: "fontless"
 
-externalSecrets:
-  # Name for the Kubernetes Secret and name of the AWS Secret from where to extract data.
-  fontless: "thn-stg-fontless"
-
 # Select the port to expose to the cluster. 80 is the default unless otherwise specified.
 service:
   port: 80
@@ -53,7 +49,7 @@ deployment:
 # Set a URL to expose to the Internet.
 ingress:
   # If set to "external", the URL will be exposed in *.thehotelsnetwork.com (public). Otherwise, it'll be exposed in *.thn.app (only accessible via VPN).
-  class: "internal"
+  class: "external"
   host: "fontless.stg.thn.app"
   extraHosts:
   - host: "stg.thehotelsnetwork.com"
