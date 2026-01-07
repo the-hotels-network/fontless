@@ -48,6 +48,7 @@ jobs:
           dockerfile: ./docker/Dockerfile
           region: AWS_REGION
           repo: ${ECR_REPOSITORY}
+          remote-docker-layer-caching: true
           remote-docker-version: docker24
           setup-remote-docker: true
           skip-when-tags-exist: true
