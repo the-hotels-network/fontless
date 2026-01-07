@@ -1,92 +1,69 @@
-# Default values for application.
-# Declare variables to be passed into your templates.
-
-## Image Info
-image:
-  registry: ""
-  repository: ""
-  tag: ""
-  pullPolicy: IfNotPresent
-
-# Basic parameters
-external_ingress: true
+# Chart-wide values.
+env: "prd"
+# Where to install ALL objects of the chart.
 namespace: "fontless"
-applicationName: "fontless"
-applicationVersion: 1.0.0
-port: 80
-targetPort: 3000
-startupProbePath: "/api/health"
-install_namespace: false
-## Datadog Section
-## https://docs.datadoghq.com/agent/kubernetes/log/?tab=daemonset
-datadogAppAnnotations: '[{ "source" : "fontless-prd", "service": "fontless-prd" }]'
-apm: true
-terminationGracePeriodSeconds: 60
 
-entrypoint:
-  - /bin/sh
-  - -c
-  - cd /app/ && npm run start
-
-# AWS Secret Manager
-awsSecret:
-  enabled: false
-  name: "thn-prd-fontless"
-
-## Configure Resources for Containers
-## ref: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-resources:
-  limits:
-    ephemeral-storage: 1500Mi
-    cpu: 100m
-    memory: 512Mi
-  requests:
-    ephemeral-storage: 1500Mi
-    cpu: 100m
-    memory: 512Mi
-
-## Configure nodeSelector
-## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
-## If you need a new node, send a JIRA to infra team
-nodeSelector:
-  enabled: true
-  values:
-    ng: prd-hp
-
-# Configure deploymentStrategy
-deploymentStrategy:
-  enabled: true
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 20%
-      maxUnavailable: 0
-
-# PodDisruptionBudget
 pdb:
-  enabled: true
   minAvailable: 1
 
-# HorizontalPodAutoscaler
+# Select the port to expose to the cluster. 80 is the default unless otherwise specified.
+service:
+  port: 80
+
+deployment:
+  # Settings for the main deployment object.
+  rollingUpdateMaxSurge: "20%"
+  rollingUpdateMaxUnavailable: "0"
+  # Settings for the deployment's pods.
+  datadogAnnotations: '[{"source": "fontless", "service": "fontless-prd"}]'
+  nodeSelector:
+    ng: prd-hp
+  terminationGracePeriodSeconds: 60
+  # Settings for the deployment's container.
+  container:
+    apm: true
+    command:
+      - /bin/sh
+      - -c
+      - cd /app/ && npm run start
+    # Set which port to expose from the container to the pod. Not to be confused with the service one.
+    port: 3000
+    resources:
+      limits:
+        cpu: 100m
+        memory: 512Mi
+        ephemeral-storage: 1500Mi
+      requests:
+        cpu: 100m
+        memory: 512Mi
+        ephemeral-storage: 1500Mi
+    # Check if the container has started properly.
+    startupProbe:
+      httpGet:
+        path: "/api/health"
+      initialDelaySeconds: 45
+    # If the container has started properly, periodically check if its service is still active.
+    livenessProbe:
+      periodSeconds: 300
+    # If the container has started properly, periodically check if its service is still ready to serve traffic.
+    readinessProbe:
+      httpGet:
+        path: "/api/health"
+      failureThreshold: 3
+      initialDelaySeconds: 10
+      periodSeconds: 300
+
+# Autoscaling settings.
 hpa:
-  enabled: true
-  values:
-    minReplicas: 2
-    maxReplicas: 20
-    metrics:
-    - type: Resource
-      resource:
-        name: memory
-        target:
-          type: Utilization
-          averageUtilization: 90
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 90
+  maxReplicas: 20
+  minReplicas: 2
+  memoryAverageUtilization: 90
+  cpuAverageUtilization: 90
 
-nginx_ingress_snippet:
+# Set a URL to expose to the Internet.
+ingress:
+  # If set to "external", the URL will be exposed in *.thehotelsnetwork.com (public). Otherwise, it'll be exposed in *.thn.app (only accessible via VPN).
+  class: "internal"
+  host: "fontless.thn.app"
+  nginxSnippet:
   - rewrite ^/gfonts(.*) $1 break;
-
