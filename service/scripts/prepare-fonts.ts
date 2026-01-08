@@ -24,7 +24,7 @@ Learn more at https://github.com/majodev/google-webfonts-helper
 
 function sleeper(ms: number) {
   return function() {
-    return new Promise(resolve => setTimeout(() => resolve(), ms));
+    return new Promise<void>(resolve => setTimeout(() => resolve(), ms));
   };
 }
 
