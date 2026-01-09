@@ -1,3 +1,5 @@
+import { promisify } from 'util';
+import { pipeline } from 'stream';
 import fs from 'fs-extra';
 import path from 'path';
 import axios from 'axios';
@@ -61,35 +63,39 @@ let fetchFontsData = (fonts: Font[]) => {
 let getVariantFileName = (variant: FontVariant, type: string) =>
   `${variant.fontStyle || 'normal'}-${variant.fontWeight || '400'}.${type}`;
 
+const streamPipeline = promisify(pipeline);
+
 let fetchVariant = async (fontId: string, variant: FontVariant) => {
-  let downloadAndCreateFont = (type: 'woff' | 'woff2') =>
-    new Promise(async (resolve, reject) => {
-      let url = variant[type];
-      let res = await axios.get(url, {
-        responseType: 'stream'
-      });
-
-      let writer = fs.createWriteStream(
-        path.join(fontsPath, fontId, getVariantFileName(variant, type))
-      );
-      res.data.pipe(writer);
-
-      let error = false;
-
-      writer.on('error', err => {
-        error = true;
-        writer.close();
-        reject(err);
-      });
-
-      writer.on('close', () => {
-        if (!error) {
-          resolve(true);
+  let downloadAndCreateFont = async (type: 'woff' | 'woff2', retries = 5) => {
+    let url = variant[type];
+    let dest = path.join(fontsPath, fontId, getVariantFileName(variant, type));
+    for (let i = 0; i < retries; i += 1) {
+      try {
+        console.log(`\t- ${variant.id}: ${type}${ i ? ` (retry ${i}/${retries})` : ''}`);
+        let res = await axios.get(url, {
+          responseType: 'stream',
+          timeout: 20000 // 20 second timeout
+        });
+        await streamPipeline(
+          res.data,
+          fs.createWriteStream(dest)
+        );
+        return;
+      } catch (err) {
+        const isLastRetry = i === retries - 1;
+        if (!isLastRetry) {
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+          continue;
         }
-      });
-    });
+        console.error(`   🚨 Failed ${fontId} ${variant.id} ${type}: ${err.message}`);
+        throw err;
+      }
+    }
+  };
 
-  return Promise.all([downloadAndCreateFont('woff'), downloadAndCreateFont('woff2')]);
+  await downloadAndCreateFont('woff');
+  await downloadAndCreateFont('woff2');
 };
 
 let presentFont = (font: FontData) => ({
@@ -117,17 +123,15 @@ let fetchFont = async (font: FontData) => {
     JSON.stringify(presentFont(font))
   );
 
-  return Promise.all(font.variants.map(v => fetchVariant(font.id, v)));
+  for (const variant of font.variants) {
+      await fetchVariant(font.id, variant);
+  }
 };
 
 let setupFonts = async (fonts: FontData[]) => {
-  const promises = [];
-  fonts.forEach((font) => {
-      promises.push(
-          Promise.all(promises).then(() => fetchFont(font))
-      );
-  });
-  return Promise.all(promises);
+  for (const font of fonts) {
+      await fetchFont(font);
+  }
 };
 
 let writeFontsData = async (fonts: FontData[], config: any) => {
