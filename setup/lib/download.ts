@@ -1,5 +1,5 @@
 export let download = (filename: string, type: string, content: string | Uint8Array) => {
-  let blob = new Blob([content], { type });
+  let blob = new Blob([content as any], { type });
 
   let link = document.createElement('a');
   link.download = filename;

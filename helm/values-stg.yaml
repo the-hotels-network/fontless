@@ -1,0 +1,55 @@
+# Chart-wide values.
+env: "stg"
+applicationName: "fontless"
+# Where to install ALL objects of the chart.
+namespace: "fontless"
+
+# Select the port to expose to the cluster. 80 is the default unless otherwise specified.
+service:
+  port: 80
+
+deployment:
+  # Settings for the deployment's pods.
+  datadogAnnotations: '[{"source": "fontless", "service": "fontless-stg"}]'
+  terminationGracePeriodSeconds: 60
+  # Settings for the deployment's container.
+  container:
+    apm: true
+    command:
+      - /bin/sh
+      - -c
+      - cd /app/ && npm run start
+    # Set which port to expose from the container to the pod. Not to be confused with the service one.
+    port: 3000
+    resources:
+      limits:
+        cpu: 100m
+        memory: 512Mi
+        ephemeral-storage: 1500Mi
+      requests:
+        cpu: 50m
+        memory: 256Mi
+        ephemeral-storage: 1500Mi
+    # Check if the container has started properly.
+    startupProbe:
+      httpGet:
+        path: "/api/health"
+      initialDelaySeconds: 45
+    # If the container has started properly, periodically check if its service is still active.
+    livenessProbe:
+      periodSeconds: 300
+    # If the container has started properly, periodically check if its service is still ready to serve traffic.
+    readinessProbe:
+      httpGet:
+        path: "/api/health"
+      failureThreshold: 3
+      initialDelaySeconds: 10
+      periodSeconds: 300
+
+# Set a URL to expose to the Internet.
+ingress:
+  # If set to "external", the URL will be exposed in *.thehotelsnetwork.com (public). Otherwise, it'll be exposed in *.thn.app (only accessible via VPN).
+  class: "internal"
+  host: "fontless.stg.thn.app"
+  nginxSnippet:
+  - rewrite ^/gfonts(.*) $1 break;

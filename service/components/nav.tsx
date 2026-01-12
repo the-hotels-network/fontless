@@ -17,7 +17,7 @@ export let Navbar = ({ name }: { name: string }) => {
   let [open, setOpen] = useState(false);
   let { width } = useSize();
   let { y } = useScroll();
-  let lastYRef = useRef<number>();
+  let lastYRef = useRef<number>(0);
 
   useEffect(() => {
     if (width > 870 && open) setOpen(false);

@@ -1,58 +1,91 @@
 version: 2.1
 orbs:
-  aws-eks: circleci/aws-eks@2.2.0
+  aws-cli: circleci/aws-cli@5.4.1
   aws-ecr: circleci/aws-ecr@7.3.0
-  helm: circleci/helm@2.0.1
+  aws-eks: circleci/aws-eks@3.0.1
+  helm: circleci/helm@3.2.0
 defaults: &defaults
   working_directory: ~/fontless
   resource_class: medium
   environment:
-    CHART_VERSION: 1.2.8
+    CHART_NAME: single-container
+parameters:
+  dyn:
+    type: boolean
+    default: false
 jobs:
-
   deploy:
     <<: *defaults
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.13.8
     steps:
       - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - aws-eks/update-kubeconfig-with-authenticator:
-          cluster-name: ${CLUSTER_NAME}
-          aws-region: ${AWS_REGION}
-          install-kubectl: false
+      - helm/install_helm_client
+      - when:
+          condition: << pipeline.parameters.dyn >>
+          steps:
+            - run:
+                name: Setup environment variable for URL
+                command: |
+                  echo 'export NORMALIZED_BRANCH=`echo ${CIRCLE_BRANCH} | tr -cd '[:alnum:]' | tr '[:upper:]' '[:lower:]' | cut -c 1-37`' >> "$BASH_ENV" && \
+                  echo 'export URL=`grep "^  host:" helm/values-${ENV}.yaml | tr -s "[:blank:]\"" ":" | cut -d: -f3`' >> "$BASH_ENV" && \
+                  echo 'export URL=`echo ${NORMALIZED_BRANCH}-${URL}`' >> "$BASH_ENV"
+      - unless:
+          condition: << pipeline.parameters.dyn >>
+          steps:
+          - run:
+              name: Setup environment variable for URL
+              command: |
+                echo 'export URL=`grep "^  host:" helm/values-${ENV}.yaml | tr -s "[:blank:]\"" ":" | cut -d: -f3`' >> "$BASH_ENV"
+      - aws-cli/setup:
+          aws_access_key_id: AWS_ACCESS_KEY_ID
+          aws_secret_access_key: AWS_SECRET_ACCESS_KEY
+      - aws-eks/update_kubeconfig_with_authenticator:
+          aws_region: ${AWS_REGION}
+          cluster_name: ${CLUSTER_NAME}
       - aws-ecr/build-and-push-image:
           account-url: AWS_ECR_ACCOUNT
-          aws-access-key-id: AWS_ACCESS_KEY_ID
-          aws-secret-access-key: AWS_SECRET_ACCESS_KEY
-          no-output-timeout: 20m
-          path: .
           dockerfile: ./docker/Dockerfile
           region: AWS_REGION
           repo: ${ECR_REPOSITORY}
+          remote-docker-layer-caching: true
+          remote-docker-version: docker24
+          setup-remote-docker: true
           skip-when-tags-exist: true
-          tag: ${CIRCLE_TAG},"latest"
-      - helm/install-helm-client:
-          version: "v3.7.2"
+          tag: '${CIRCLE_SHA1},${CIRCLE_TAG}'
+          extra-build-args: '--build-arg CIRCLE_BRANCH=${CIRCLE_BRANCH} --build-arg CIRCLE_TAG=${CIRCLE_TAG}'
       - run:
-          name: Apply k8s
+          name: Render Helm templates
           command: |
-            helm repo add the-hotels-network \
-              --username "${GITHUB_TOKEN}" \
-              --password "${GITHUB_TOKEN}" \
-              "https://raw.githubusercontent.com/the-hotels-network/helm-templates/master/"
-            helm upgrade -i fontless-release the-hotels-network/single-container --wait -f ./k8s/values-${ENV}.yaml \
-              --version ${CHART_VERSION} \
-              --set image.tag=${CIRCLE_TAG} \
-              --set image.applicationVersion=${CIRCLE_TAG} \
-              --set image.registry=${AWS_ECR_ACCOUNT} \
-              --set image.repository=${ECR_REPOSITORY}
+            helm template ${CIRCLE_PROJECT_REPONAME}${NORMALIZED_BRANCH} \
+              oci://${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${COMPANY_PREFIX}-${HELM_CHARTS_REPOSITORY}/${CHART_NAME} \
+              --debug \
+              --disable-openapi-validation \
+              --namespace ${CIRCLE_PROJECT_REPONAME} \
+              --set applicationName="${CIRCLE_PROJECT_REPONAME}${NORMALIZED_BRANCH}" \
+              --set applicationVersion=`if [ -z ${CIRCLE_TAG} ]; then echo ${CIRCLE_SHA1}; else echo ${CIRCLE_TAG}; fi` \
+              --set deployment.container.image="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:`if [ -z ${CIRCLE_TAG} ]; then echo ${CIRCLE_SHA1}; else echo ${CIRCLE_TAG}; fi`" \
+              --values helm/values-${ENV}.yaml \
+              --version ${GLOBAL_SINGLE_CONTAINER_VERSION}
       - run:
-          name: Verify deployment status
+          name: Install Helm chart
           command: |
-            helm test fontless-release
-            echo "deployment succeeded"
+            helm upgrade -i ${CIRCLE_PROJECT_REPONAME}${NORMALIZED_BRANCH} \
+              oci://${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${COMPANY_PREFIX}-${HELM_CHARTS_REPOSITORY}/${CHART_NAME} \
+              --namespace ${CIRCLE_PROJECT_REPONAME} \
+              --set applicationName="${CIRCLE_PROJECT_REPONAME}${NORMALIZED_BRANCH}" \
+              --set applicationVersion=`if [ -z ${CIRCLE_TAG} ]; then echo ${CIRCLE_SHA1}; else echo ${CIRCLE_TAG}; fi` \
+              --set deployment.container.image="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:`if [ -z ${CIRCLE_TAG} ]; then echo ${CIRCLE_SHA1}; else echo ${CIRCLE_TAG}; fi`" \
+              --values helm/values-${ENV}.yaml \
+              --version ${GLOBAL_SINGLE_CONTAINER_VERSION} \
+              --wait
+      - run:
+          name: Test Helm release
+          command: |
+            helm test ${CIRCLE_PROJECT_REPONAME}${NORMALIZED_BRANCH} \
+              --namespace ${CIRCLE_PROJECT_REPONAME} && \
+            echo "${CIRCLE_PROJECT_REPONAME}${NORMALIZED_BRANCH} Helm release created successfully." && \
+            echo "Your ${ENV} environment is ready to use at $URL."
 
 workflows:
   staging:

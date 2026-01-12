@@ -16,11 +16,12 @@ const name = 'thn-fontless-service';
 (async function () {
     const fonts = await fetchFonts();
 
+    const branch = process.env.CIRCLE_BRANCH || process.env.CIRCLE_TAG || 'main';
     let data = createFontServiceConfig(fonts, selectedFonts, name);
-    let contents = await getRepoContents({ org: 'the-hotels-network', repo: 'fontless', path: 'service' });
+    let contents = await getRepoContents({ org: 'the-hotels-network', repo: 'fontless', path: 'service', branch });
     let zip = await zipRepo(contents, JSON.stringify(data, undefined, 2), true);
     if (zip instanceof JSZip) {
-        zip.generateNodeStream({ type:'nodebuffer', streamFiles: true })
+        zip.generateNodeStream({ type: 'nodebuffer', streamFiles: true })
             .pipe(fs.createWriteStream('deployment.zip'))
             .on('finish', function () {
                 // JSZip generates a readable stream with a "end" event,
