@@ -53,6 +53,7 @@ jobs:
           setup-remote-docker: true
           skip-when-tags-exist: true
           tag: '${CIRCLE_SHA1},${CIRCLE_TAG}'
+          extra-build-args: '--build-arg CIRCLE_BRANCH=${CIRCLE_BRANCH} --build-arg CIRCLE_TAG=${CIRCLE_TAG}'
       - run:
           name: Render Helm templates
           command: |
