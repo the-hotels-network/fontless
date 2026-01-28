@@ -65,5 +65,5 @@ ingress:
   # If set to "external", the URL will be exposed in *.thehotelsnetwork.com (public). Otherwise, it'll be exposed in *.thn.app (only accessible via VPN).
   class: "internal"
   host: "fontless.thn.app"
-  nginxSnippet:
-  - rewrite ^/gfonts(.*) $1 break;
+  extraConfigurationSnippet: |
+    rewrite ^/gfonts(.*) $1 break;
