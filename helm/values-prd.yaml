@@ -60,10 +60,10 @@ hpa:
   memoryAverageUtilization: 90
   cpuAverageUtilization: 90
 
-# Set a URL to expose to the Internet.
-ingress:
-  # If set to "external", the URL will be exposed in *.thehotelsnetwork.com (public). Otherwise, it'll be exposed in *.thn.app (only accessible via VPN).
+# Set a URL to expose to the Internet via gateway + HTTPRoute.
+gateway:
+  # If set to "external", it will be exposed in *.thehotelsnetwork.com.
+  # Otherwise, it'll be exposed in *.thn.app (only accessible via VPN).
   class: "internal"
-  host: "fontless.thn.app"
-  extraConfigurationSnippet: |
+  hostname: "fontless.thn.app"
     rewrite ^/gfonts(.*) $1 break;
