@@ -4,6 +4,9 @@ applicationName: "fontless"
 # Where to install ALL objects of the chart.
 namespace: "fontless"
 
+serviceAccount:
+  create: true
+
 # Select the port to expose to the cluster. 80 is the default unless otherwise specified.
 service:
   port: 80

@@ -6,6 +6,9 @@ namespace: "fontless"
 pdb:
   minAvailable: 1
 
+serviceAccount:
+  create: true
+
 # Select the port to expose to the cluster. 80 is the default unless otherwise specified.
 service:
   port: 80
