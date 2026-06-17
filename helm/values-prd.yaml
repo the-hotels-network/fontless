@@ -11,9 +11,6 @@ service:
   port: 80
 
 ## Service Account
-serviceAccount:
-  create: true
-
 deployment:
   # Settings for the main deployment object.
   rollingUpdateMaxSurge: "20%"

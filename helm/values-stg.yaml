@@ -9,9 +9,6 @@ service:
   port: 80
 
 ## Service Account
-serviceAccount:
-  create: true
-  
 deployment:
   # Settings for the deployment's pods.
   datadogAnnotations: '[{"source": "fontless", "service": "fontless-stg"}]'
