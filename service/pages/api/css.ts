@@ -2,11 +2,16 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import nextCors from 'nextjs-cors';
 import { missingFamilyError } from '../../server/errors/missingFamily';
 import { invalidFontDisplayError } from '../../server/errors/invalidFontDisplay';
+import { invalidSuffixError } from '../../server/errors/invalidSuffix';
 import { parseFamilyParam } from '../../server/parseFamilyParam';
 import { getVariants } from '../../server/getVariants';
 import { getCss } from '../../server/getCss';
 
 let fonts = require('../../public/fonts.json').fonts;
+
+// A suffix that closes the quoted family name or the surrounding CSS comment makes the
+// parser drop the whole @font-face rule, and the font then falls back silently.
+const unsafeSuffix = /['"\\\n\r\f]|\*\//;
 
 export default async (req: NextApiRequest, res: NextApiResponse) => {
 
@@ -24,6 +29,11 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     return res.status(406).send(invalidFontDisplayError);
   }
 
+  const suffix = Array.isArray(req.query.suffix) ? req.query.suffix[0] : req.query.suffix;
+  if (suffix && unsafeSuffix.test(suffix)) {
+    return res.status(406).send(invalidSuffixError);
+  }
+
   let parsedFonts = parseFamilyParam(family, res);
   if (res.headersSent || !parsedFonts) return;
 
@@ -32,7 +42,7 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
   // We use relative path for the assets. Alternative:
   // const host = `https://${req.headers.host}`;
   const host = '.';
-  let css = getCss(host, variants, display);
+  let css = getCss(host, variants, display, suffix);
 
   res.setHeader('Content-Type', 'text/css');
   res.setHeader('Cache-Control', `max-age=${60 * 10}, s-maxage=${60 * 60 * 6}`);
