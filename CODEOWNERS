@@ -2,12 +2,12 @@
 # the target repo. The following users will be requested for
 # review when someone opens a pull request.
 
-* @the-hotels-network/frontend @the-hotels-network/agent 
+* @the-hotels-network/frontend @the-hotels-network/websdk 
 
 # The /.circleci folder contains all Circle CI workflow pipelines. When updating
 # its content we will want the Infra team to sign off on the changes. Having one
 # approval from their team is enough to move on.
-.circleci @the-hotels-network/infra @the-hotels-network/frontend @the-hotels-network/agent
+.circleci @the-hotels-network/infra @the-hotels-network/frontend @the-hotels-network/websdk
 
 # *********************************************************************
 # (c) The Hotels Network
