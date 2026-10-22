@@ -1,4 +1,4 @@
-FROM node:16-alpine3.16 as builder
+FROM node:22.23.4-alpine as builder
 
 ARG CIRCLE_BRANCH
 ARG CIRCLE_TAG
@@ -14,7 +14,7 @@ RUN npm install
 
 RUN cd setup && npm run build && npm run do-setup
 
-FROM node:16-alpine3.16
+FROM node:22.23.4-alpine
 
 WORKDIR /app
 
