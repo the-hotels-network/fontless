@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next",
-    "build": "next build && esbuild --bundle --platform=node --outfile=dist/doSetup.js operations/doSetup.ts",
+    "build": "next build && npm run build:setup",
+    "build:setup": "esbuild --bundle --platform=node --outfile=dist/doSetup.js operations/doSetup.ts",
     "start": "next start",
     "do-setup": "node dist/doSetup.js"
   },

@@ -34,6 +34,30 @@ function getRandomArbitrary(min: number, max: number): number {
     return Math.random() * (max - min) + min;
 }
 
+const META_CONCURRENCY = 4;
+const DOWNLOAD_CONCURRENCY = 8;
+
+// Runs fn over items with at most `limit` in flight. Fails fast: on the first
+// rejection no new items are started and the returned promise rejects.
+async function pool<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  let failed = false;
+  const worker = async () => {
+    while (!failed && next < items.length) {
+      const i = next++;
+      try {
+        results[i] = await fn(items[i], i);
+      } catch (err) {
+        failed = true;
+        throw err;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 let fetchFontData = async (font: Font, subsets = 'vietnamese,latin-ext,latin,greek-ext,greek,cyrillic-ext,cyrillic,khmer,korean'): Promise<FontData> => {
   console.log(`> Fetching font data for "${font.id}" ${subsets ? '' : '(retry)'}`);
   let res = await axios.get(
@@ -43,22 +67,17 @@ let fetchFontData = async (font: Font, subsets = 'vietnamese,latin-ext,latin,gre
   return res.data;
 };
 
-let fetchFontsData = (fonts: Font[]) => {
-  const promises = [];
-  fonts.forEach((font) => {
-      promises.push(
-          Promise.all(promises)
-            .then(sleeper(getRandomArbitrary(200, 800)))
-            .then(() => fetchFontData(font))
-            .catch(() => {
-              return Promise.resolve()
-                .then(sleeper(getRandomArbitrary(200, 800)))
-                .then(() => fetchFontData(font, null));
-            })
-      );
-  });
-  return Promise.all(promises);
-};
+let fetchFontsData = (fonts: Font[]) =>
+  pool(fonts, META_CONCURRENCY, font =>
+    Promise.resolve()
+      .then(sleeper(getRandomArbitrary(200, 800)))
+      .then(() => fetchFontData(font))
+      .catch(() => {
+        return Promise.resolve()
+          .then(sleeper(getRandomArbitrary(200, 800)))
+          .then(() => fetchFontData(font, null));
+      })
+  );
 
 let getVariantFileName = (variant: FontVariant, type: string) =>
   `${variant.fontStyle || 'normal'}-${variant.fontWeight || '400'}.${type}`;
@@ -71,7 +90,7 @@ let fetchVariant = async (fontId: string, variant: FontVariant) => {
     let dest = path.join(fontsPath, fontId, getVariantFileName(variant, type));
     for (let i = 0; i < retries; i += 1) {
       try {
-        console.log(`\t- ${variant.id}: ${type}${ i ? ` (retry ${i}/${retries})` : ''}`);
+        if (i) console.log(`\t- ${fontId} ${variant.id}: ${type} (retry ${i}/${retries})`);
         let res = await axios.get(url, {
           responseType: 'stream',
           timeout: 20000 // 20 second timeout
@@ -115,8 +134,6 @@ let presentFont = (font: FontData) => ({
 });
 
 let fetchFont = async (font: FontData) => {
-  console.log(`> Downloading ${font.family}`);
-
   await fs.ensureDir(path.join(fontsPath, font.id));
   await fs.writeFile(
     path.join(fontsPath, font.id, 'data.json'),
@@ -129,9 +146,11 @@ let fetchFont = async (font: FontData) => {
 };
 
 let setupFonts = async (fonts: FontData[]) => {
-  for (const font of fonts) {
-      await fetchFont(font);
-  }
+  let done = 0;
+  await pool(fonts, DOWNLOAD_CONCURRENCY, async font => {
+    await fetchFont(font);
+    console.log(`> [${++done}/${fonts.length}] ${font.family}`);
+  });
 };
 
 let writeFontsData = async (fonts: FontData[], config: any) => {
