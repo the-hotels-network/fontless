@@ -1,4 +1,4 @@
-FROM node:16-alpine3.16 as builder
+FROM node:22.23.4-alpine AS builder
 
 ARG CIRCLE_BRANCH
 ARG CIRCLE_TAG
@@ -12,13 +12,13 @@ WORKDIR /src
 
 RUN npm install
 
-RUN cd setup && npm run build && npm run do-setup
+RUN cd setup && npm run build:setup && npm run do-setup
 
-FROM node:16-alpine3.16
+FROM node:22.23.4-alpine
 
 WORKDIR /app
 
 COPY --from=builder /src/setup/deployment.zip ./
 
-RUN unzip deployment.zip -o && npm install && npm run build
-
+# Next 9 / webpack 4 needs the legacy OpenSSL provider (MD4) on Node 17+
+RUN unzip -o deployment.zip && npm install && NODE_OPTIONS=--openssl-legacy-provider npm run build
